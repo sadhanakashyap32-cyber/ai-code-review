@@ -26,6 +26,39 @@ function cn(...inputs) {
   return twMerge(clsx(inputs));
 }
 
+const detectLanguage = (code, filename) => {
+  if (filename) {
+    const ext = filename.split('.').pop().toLowerCase();
+    const map = {
+      'js': 'javascript',
+      'jsx': 'javascript',
+      'ts': 'typescript',
+      'tsx': 'typescript',
+      'py': 'python',
+      'rb': 'ruby',
+      'java': 'java',
+      'go': 'go',
+      'rs': 'rust',
+      'cpp': 'cpp',
+      'c': 'c',
+      'cs': 'csharp',
+      'php': 'php',
+      'html': 'html',
+      'css': 'css',
+      'json': 'json',
+      'md': 'markdown'
+    };
+    if (map[ext]) return map[ext];
+  }
+  
+  // Simple content-based detection if filename is missing
+  if (code.includes('import React') || code.includes('export default')) return 'javascript';
+  if (code.includes('def ') || code.includes('import ')) return 'python';
+  if (code.includes('class ') && code.includes('public static void main')) return 'java';
+  
+  return 'javascript'; // Default
+};
+
 const TabButton = ({ active, onClick, icon: Icon, label }) => (
   <button
     onClick={onClick}
@@ -49,6 +82,7 @@ export default function Home() {
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState("bugs");
   const [mode, setMode] = useState("manual"); // 'manual' | 'github'
+  const [detectedLang, setDetectedLang] = useState("javascript");
 
   const handleFetchGithub = async () => {
     if (!githubUrl.trim()) return;
@@ -57,23 +91,20 @@ export default function Home() {
     setError(null);
     
     try {
-      // Basic URL transformation to get raw content
-      let rawUrl = githubUrl;
-      const githubRegex = /github\.com\/([^/]+)\/([^/]+)\/blob\/([^/]+)\/(.+)/;
-      const match = githubUrl.match(githubRegex);
+      const response = await fetch("/api/github", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: githubUrl }),
+      });
       
-      if (match) {
-        const [_, user, repo, branch, path] = match;
-        rawUrl = `https://raw.githubusercontent.com/${user}/${repo}/${branch}/${path}`;
-      } else if (!githubUrl.includes('raw.githubusercontent.com')) {
-        throw new Error("Please provide a valid GitHub file URL (e.g., github.com/user/repo/blob/main/file.js)");
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to fetch GitHub content.");
       }
       
-      const response = await fetch(rawUrl);
-      if (!response.ok) throw new Error("Failed to fetch GitHub file content.");
-      
-      const content = await response.text();
-      setCode(content);
+      setCode(data.content);
+      setDetectedLang(detectLanguage(data.content, githubUrl));
       setMode("manual"); // Switch to manual after fetching
     } catch (err) {
       console.error(err);
@@ -106,30 +137,100 @@ export default function Home() {
       setResults(data);
     } catch (err) {
       console.error(err);
-      setError(err.message);
+      const isConnectionError = err.message.toLowerCase().includes("connection error") || 
+                               err.message.toLowerCase().includes("fetch");
+      setError(isConnectionError 
+        ? "Network connection error. Please check your internet connection or ensure you can reach api.openai.com." 
+        : err.message
+      );
     } finally {
       setLoading(false);
     }
   };
 
+  const handleReset = () => {
+    setCode("");
+    setGithubUrl("");
+    setResults(null);
+    setError(null);
+    setMode("manual");
+  };
+
+  const handleCopy = (text) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    // Optional: add a toast or temporary state for "Copied!"
+  };
+
   const exportToPDF = async () => {
-    const element = document.getElementById('review-results');
-    if (!element) return;
+    if (!results) return;
     
     setLoading(true);
     try {
-      const canvas = await html2canvas(element, {
-        backgroundColor: '#0a0a0a',
-        scale: 2
-      });
-      const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgProps = pdf.getImageProperties(imgData);
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      const margin = 20;
+      let y = 20;
+
+      // Header
+      pdf.setFontSize(22);
+      pdf.setTextColor(33, 150, 243); // Blue
+      pdf.text("AI Code Review Report", margin, y);
+      y += 10;
       
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save('ai-code-review.pdf');
+      pdf.setFontSize(10);
+      pdf.setTextColor(100, 100, 100);
+      pdf.text(`Generated on: ${new Date().toLocaleString()}`, margin, y);
+      y += 15;
+
+      // Rating
+      pdf.setFontSize(14);
+      pdf.setTextColor(0, 0, 0);
+      pdf.text(`Overall Quality Rating: ${results.rating}/10`, margin, y);
+      y += 10;
+
+      // Documentation
+      pdf.setFontSize(16);
+      pdf.text("Project Overview", margin, y);
+      y += 7;
+      pdf.setFontSize(11);
+      const docs = pdf.splitTextToSize(results.documentation, 170);
+      pdf.text(docs, margin, y);
+      y += (docs.length * 6) + 10;
+
+      // Bugs
+      if (results.bugs && results.bugs.length > 0) {
+        pdf.setFontSize(16);
+        pdf.setTextColor(244, 67, 54); // Red
+        pdf.text("Critical Bugs", margin, y);
+        y += 7;
+        pdf.setFontSize(11);
+        pdf.setTextColor(0, 0, 0);
+        results.bugs.forEach((bug, i) => {
+          const bugText = pdf.splitTextToSize(`${i+1}. ${bug}`, 170);
+          pdf.text(bugText, margin, y);
+          y += (bugText.length * 6);
+        });
+        y += 10;
+      }
+
+      // Suggestions
+      if (results.suggestions && results.suggestions.length > 0) {
+        if (y > 250) { pdf.addPage(); y = 20; }
+        pdf.setFontSize(16);
+        pdf.setTextColor(33, 150, 243); // Blue
+        pdf.text("Improvement Suggestions", margin, y);
+        y += 7;
+        pdf.setFontSize(11);
+        pdf.setTextColor(0, 0, 0);
+        results.suggestions.forEach((sug, i) => {
+          const sugText = pdf.splitTextToSize(`• ${sug}`, 170);
+          if (y > 270) { pdf.addPage(); y = 20; }
+          pdf.text(sugText, margin, y);
+          y += (sugText.length * 6);
+        });
+      }
+
+      pdf.save('ai-code-review-report.pdf');
     } catch (err) {
       console.error("PDF Export failed:", err);
       setError("Failed to export PDF.");
@@ -205,27 +306,45 @@ export default function Home() {
             </div>
             <textarea
               value={code}
-              onChange={(e) => setCode(e.target.value)}
+              onChange={(e) => {
+                setCode(e.target.value);
+                setDetectedLang(detectLanguage(e.target.value));
+              }}
               placeholder="Paste your Javascript, Python, or React code here..."
               className="w-full h-80 bg-black/40 border border-border rounded-xl p-4 font-mono text-sm focus:ring-2 focus:ring-blue-500/50 outline-none transition-all placeholder:text-foreground/20 resize-none"
             />
           </div>
         )}
 
-        <div className="flex justify-end">
+        <div className="flex justify-between items-center">
           <button
-            onClick={handleReview}
-            disabled={loading || !code.trim()}
-            className={cn(
-              "flex items-center gap-2 px-8 py-4 rounded-xl font-bold transition-all",
-              loading || !code.trim() 
-                ? "bg-muted text-foreground/20 cursor-not-allowed" 
-                : "bg-blue-600 hover:bg-blue-500 hover:shadow-lg hover:shadow-blue-500/20 active:scale-95 text-white"
-            )}
+            onClick={handleReset}
+            className="text-foreground/40 hover:text-red-400 text-sm font-medium transition-all flex items-center gap-2"
           >
-            {loading ? <Loader2 className="animate-spin" /> : <Send size={18} />}
-            {loading ? "Analyzing..." : "Review Code"}
+            <Star size={14} className="rotate-45" />
+            Reset
           </button>
+          <div className="flex gap-4">
+            <button
+              onClick={() => handleCopy(code)}
+              className="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-bold transition-all"
+            >
+              Copy Code
+            </button>
+            <button
+              onClick={handleReview}
+              disabled={loading || !code.trim()}
+              className={cn(
+                "flex items-center gap-2 px-8 py-4 rounded-xl font-bold transition-all",
+                loading || !code.trim() 
+                  ? "bg-muted text-foreground/20 cursor-not-allowed" 
+                  : "bg-blue-600 hover:bg-blue-500 hover:shadow-lg hover:shadow-blue-500/20 active:scale-95 text-white"
+              )}
+            >
+              {loading ? <Loader2 className="animate-spin" /> : <Send size={18} />}
+              {loading ? "Analyzing..." : "Review Code"}
+            </button>
+          </div>
         </div>
       </section>
 
@@ -321,15 +440,24 @@ export default function Home() {
             {activeTab === "documentation" && (
               <div className="prose prose-invert max-w-none">
                 <div className="p-6 rounded-xl bg-white/5 border border-border">
-                  <p className="text-foreground/80 leading-relaxed whitespace-pre-wrap mb-6">
-                    {results.documentation}
-                  </p>
+                  <div className="flex justify-between items-start mb-4">
+                    <p className="text-foreground/80 leading-relaxed whitespace-pre-wrap flex-1">
+                      {results.documentation}
+                    </p>
+                    <button
+                      onClick={() => handleCopy(results.documentation)}
+                      className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-foreground/40 hover:text-white transition-all ml-4"
+                      title="Copy Docs"
+                    >
+                      <Download size={14} className="rotate-180" />
+                    </button>
+                  </div>
                   <div className="bg-black/40 rounded-lg overflow-hidden border border-border">
                     <div className="flex items-center justify-between px-4 py-2 bg-white/5 border-b border-border">
                       <span className="text-xs font-mono text-foreground/40">Analyzed Code</span>
                     </div>
                     <SyntaxHighlighter
-                      language="javascript"
+                      language={detectedLang}
                       style={vscDarkPlus}
                       customStyle={{
                         background: 'transparent',

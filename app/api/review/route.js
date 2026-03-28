@@ -36,7 +36,6 @@ export async function POST(request) {
   try {
     const body = await request.json();
     const { code } = body;
-    console.log("Review Request Received for code length:", code?.length);
 
     // Validate Input
     if (!code || typeof code !== "string" || code.trim() === "") {
@@ -87,9 +86,7 @@ export async function POST(request) {
     });
 
     const content = response.choices[0].message.content;
-    console.log("AI Response Content:", content);
     const parsedResult = extractJson(content);
-    console.log("Parsed Result:", JSON.stringify(parsedResult).substring(0, 100) + "...");
 
     return NextResponse.json(parsedResult, { status: 200 });
 
