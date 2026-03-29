@@ -393,8 +393,17 @@ export default function Home() {
                   <Star size={20} fill={results.rating ? "currentColor" : "none"} />
                 </div>
                 <div>
-                  <h3 className="font-bold">Analysis Results</h3>
-                  <p className="text-xs text-foreground/40">Powered by OpenAI gpt-4o-mini</p>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold">Analysis Results</h3>
+                    {results.isMock && (
+                      <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 text-[10px] font-bold uppercase tracking-wider border border-amber-500/20">
+                        Demo Mode
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-foreground/40">
+                    {results.isMock ? "Simulated review (OpenAI Quota Limit)" : "Powered by OpenAI gpt-4o-mini"}
+                  </p>
                 </div>
               </div>
               <button

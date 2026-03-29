@@ -82,18 +82,52 @@ export async function POST(request) {
         },
         { role: "user", content: prompt },
       ],
-      temperature: 0.1, // Lower temperature for more consistent JSON structure
+      temperature: 0.1,
     });
 
     const content = response.choices[0].message.content;
     const parsedResult = extractJson(content);
 
-    return NextResponse.json(parsedResult, { status: 200 });
+    return NextResponse.json({ ...parsedResult, isMock: false }, { status: 200 });
 
   } catch (error) {
-    console.error("AI Review Error:", error);
+    console.error("AI Review Error Details:", {
+      message: error.message,
+      status: error.status,
+      code: error.code,
+      type: error.type
+    });
+
+    // Provide mock data if quota exceeded (429) or connection issues
+    const shouldFallback = 
+      error.status === 429 || 
+      error.code === 'insufficient_quota' ||
+      error.message?.toLowerCase().includes("quota") || 
+      error.message?.toLowerCase().includes("connection error") ||
+      error.message?.toLowerCase().includes("fetch") ||
+      error.message?.includes("429");
+
+    if (shouldFallback) {
+      console.log("Error detected. Triggering mock data fallback.");
+      const mockResult = {
+        bugs: [
+          "Potential memory leak in effect cleanup handler.",
+          "Missing error handling for the fetch operation.",
+          "Inconsistent state updates may cause race conditions."
+        ],
+        suggestions: [
+          "Use useMemo for expensive calculations to improve performance.",
+          "Implement debouncing on the input field to reduce API calls.",
+          "Extract the API logic into a separate custom hook for better modularity."
+        ],
+        rating: 7,
+        documentation: "This code implements a basic user interface with interactive elements and data fetching capabilities. It uses standard React hooks for state management and layout components.",
+        isMock: true
+      };
+
+      return NextResponse.json(mockResult, { status: 200 });
+    }
     
-    // Check for specific OpenAI errors if possible
     const status = error.status || 500;
     const errorMessage = error.message || "Failed to generate code review.";
 
