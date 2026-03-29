@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 
+export const maxDuration = 60; // Set max duration to 60 seconds to prevent Vercel timeouts
+
 // Initialize OpenAI client
 const getOpenAIClient = () => {
   const apiKey = process.env.OPENAI_API_KEY;

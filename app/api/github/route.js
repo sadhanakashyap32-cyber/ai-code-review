@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+export const maxDuration = 60; // Set max duration to 60 seconds to prevent Vercel timeouts
+
 export async function POST(request) {
   try {
     const { url } = await request.json();
