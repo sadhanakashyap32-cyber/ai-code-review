@@ -9,12 +9,12 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@google/genai": "^1.47.0",
     "clsx": "^2.1.1",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
     "lucide-react": "^0.414.0",
     "next": "14.2.5",
-    "openai": "^4.52.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "react-syntax-highlighter": "^16.1.1",

@@ -1,15 +1,12 @@
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
+import { GoogleGenAI } from "@google/genai";
 
-export const maxDuration = 60; // Set max duration to 60 seconds to prevent Vercel timeouts
-
-// Initialize OpenAI client
-const getOpenAIClient = () => {
-  const apiKey = process.env.OPENAI_API_KEY;
+const getGeminiClient = () => {
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    throw new Error("OPENAI_API_KEY is not configured in environment variables.");
+    throw new Error("GEMINI_API_KEY is not configured in environment variables.");
   }
-  return new OpenAI({ apiKey });
+  return new GoogleGenAI({ apiKey });
 };
 
 /**
@@ -17,11 +14,9 @@ const getOpenAIClient = () => {
  */
 function extractJson(content) {
   if (!content) return null;
-  // If the content is already valid JSON, return it
   try {
     return JSON.parse(content);
   } catch (e) {
-    // If it fails, try to strip markdown code blocks
     const jsonMatch = content.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
     if (jsonMatch && jsonMatch[1]) {
       try {
@@ -30,7 +25,7 @@ function extractJson(content) {
         throw new Error("Failed to parse JSON even after stripping markdown blocks.");
       }
     }
-    throw e; // Rethrow original error if no markdown match found
+    throw e;
   }
 }
 
@@ -39,7 +34,6 @@ export async function POST(request) {
     const body = await request.json();
     const { code } = body;
 
-    // Validate Input
     if (!code || typeof code !== "string" || code.trim() === "") {
       return NextResponse.json(
         { error: "Valid, non-empty code must be provided for review." },
@@ -47,13 +41,13 @@ export async function POST(request) {
       );
     }
 
-    let openai;
+    let ai;
     try {
-      openai = getOpenAIClient();
+      ai = getGeminiClient();
     } catch (configError) {
       console.error("Configuration Error:", configError.message);
       return NextResponse.json(
-        { error: "Server configuration error: Missing API Key." },
+        { error: "Server configuration error: Missing Gemini API Key." },
         { status: 500 }
       );
     }
@@ -74,68 +68,29 @@ export async function POST(request) {
       \`\`\`
     `;
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: "system",
-          content: "You are an expert code reviewer. You must output only a valid JSON object.",
-        },
-        { role: "user", content: prompt },
-      ],
-      temperature: 0.1,
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        systemInstruction: "You are an expert code reviewer. You must output only a valid JSON object matching the requested schema.",
+        temperature: 0.1,
+      }
     });
 
-    const content = response.choices[0].message.content;
+    const content = response.text;
     const parsedResult = extractJson(content);
 
     return NextResponse.json({ ...parsedResult, isMock: false }, { status: 200 });
 
   } catch (error) {
-    console.error("AI Review Error Details:", {
-      message: error.message,
-      status: error.status,
-      code: error.code,
-      type: error.type
-    });
-
-    // Provide mock data if quota exceeded (429) or connection issues
-    const shouldFallback = 
-      error.status === 429 || 
-      error.code === 'insufficient_quota' ||
-      error.message?.toLowerCase().includes("quota") || 
-      error.message?.toLowerCase().includes("connection error") ||
-      error.message?.toLowerCase().includes("fetch") ||
-      error.message?.includes("429");
-
-    if (shouldFallback) {
-      console.log("Error detected. Triggering mock data fallback.");
-      const mockResult = {
-        bugs: [
-          "Potential memory leak in effect cleanup handler.",
-          "Missing error handling for the fetch operation.",
-          "Inconsistent state updates may cause race conditions."
-        ],
-        suggestions: [
-          "Use useMemo for expensive calculations to improve performance.",
-          "Implement debouncing on the input field to reduce API calls.",
-          "Extract the API logic into a separate custom hook for better modularity."
-        ],
-        rating: 7,
-        documentation: "This code implements a basic user interface with interactive elements and data fetching capabilities. It uses standard React hooks for state management and layout components.",
-        isMock: true
-      };
-
-      return NextResponse.json(mockResult, { status: 200 });
-    }
+    console.error("AI Review Error Details:", error);
     
-    const status = error.status || 500;
-    const errorMessage = error.message || "Failed to generate code review.";
+    const errorMessage = error.message || "Failed to generate code review using Gemini.";
 
     return NextResponse.json(
       { error: errorMessage },
-      { status }
+      { status: 500 }
     );
   }
 }
