@@ -59,28 +59,12 @@ const detectLanguage = (code, filename) => {
   return 'javascript'; // Default
 };
 
-const TabButton = ({ active, onClick, icon: Icon, label }) => (
-  <button
-    onClick={onClick}
-    className={cn(
-      "flex items-center gap-2 px-6 py-3 border-b-2 transition-all duration-200",
-      active 
-        ? "border-blue-500 text-blue-500 bg-blue-500/5" 
-        : "border-transparent text-foreground/40 hover:text-foreground/80 hover:bg-white/5"
-    )}
-  >
-    <Icon size={18} />
-    <span className="font-medium">{label}</span>
-  </button>
-);
-
 export default function Home() {
   const [code, setCode] = useState("");
   const [githubUrl, setGithubUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState("bugs");
   const [mode, setMode] = useState("manual"); // 'manual' | 'github'
   const [detectedLang, setDetectedLang] = useState("javascript");
 
@@ -182,33 +166,37 @@ export default function Home() {
       pdf.text(`Generated on: ${new Date().toLocaleString()}`, margin, y);
       y += 15;
 
-      // Rating
+      // Score
       pdf.setFontSize(14);
       pdf.setTextColor(0, 0, 0);
-      pdf.text(`Overall Quality Rating: ${results.rating}/10`, margin, y);
+      pdf.text(`Code Quality Score: ${results.score}/100`, margin, y);
       y += 10;
 
       // Documentation
-      pdf.setFontSize(16);
-      pdf.text("Project Overview", margin, y);
-      y += 7;
-      pdf.setFontSize(11);
-      const docs = pdf.splitTextToSize(results.documentation, 170);
-      pdf.text(docs, margin, y);
-      y += (docs.length * 6) + 10;
+      if (results.documentation) {
+        pdf.setFontSize(16);
+        pdf.text("Project Overview", margin, y);
+        y += 7;
+        pdf.setFontSize(11);
+        const docs = pdf.splitTextToSize(results.documentation, 170);
+        pdf.text(docs, margin, y);
+        y += (docs.length * 6) + 10;
+      }
 
-      // Bugs
-      if (results.bugs && results.bugs.length > 0) {
+      // Issues
+      if (results.issues && results.issues.length > 0) {
         pdf.setFontSize(16);
         pdf.setTextColor(244, 67, 54); // Red
-        pdf.text("Critical Bugs", margin, y);
+        pdf.text("Issues Found", margin, y);
         y += 7;
         pdf.setFontSize(11);
         pdf.setTextColor(0, 0, 0);
-        results.bugs.forEach((bug, i) => {
-          const bugText = pdf.splitTextToSize(`${i+1}. ${bug}`, 170);
-          pdf.text(bugText, margin, y);
-          y += (bugText.length * 6);
+        results.issues.forEach((issue, i) => {
+          const text = `[${issue.type}] ${issue.description}`;
+          const issueText = pdf.splitTextToSize(`${i+1}. ${text}`, 170);
+          if (y + (issueText.length * 6) > 280) { pdf.addPage(); y = 20; }
+          pdf.text(issueText, margin, y);
+          y += (issueText.length * 6) + 2;
         });
         y += 10;
       }
@@ -224,9 +212,9 @@ export default function Home() {
         pdf.setTextColor(0, 0, 0);
         results.suggestions.forEach((sug, i) => {
           const sugText = pdf.splitTextToSize(`• ${sug}`, 170);
-          if (y > 270) { pdf.addPage(); y = 20; }
+          if (y + (sugText.length * 6) > 280) { pdf.addPage(); y = 20; }
           pdf.text(sugText, margin, y);
-          y += (sugText.length * 6);
+          y += (sugText.length * 6) + 2;
         });
       }
 
@@ -359,111 +347,122 @@ export default function Home() {
       {/* Results Section */}
       {results && (
         <section className="glass rounded-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-500">
-          <div className="border-b border-border flex overflow-x-auto no-scrollbar">
-            <TabButton 
-              active={activeTab === "bugs"} 
-              onClick={() => setActiveTab("bugs")} 
-              icon={Bug} 
-              label="Bugs" 
-            />
-            <TabButton 
-              active={activeTab === "suggestions"} 
-              onClick={() => setActiveTab("suggestions")} 
-              icon={Lightbulb} 
-              label="Suggestions" 
-            />
-            <TabButton 
-              active={activeTab === "documentation"} 
-              onClick={() => setActiveTab("documentation")} 
-              icon={FileText} 
-              label="Docs" 
-            />
-            <TabButton 
-              active={activeTab === "rating"} 
-              onClick={() => setActiveTab("rating")} 
-              icon={Star} 
-              label="Rating" 
-            />
-          </div>
-
           <div className="p-8" id="review-results">
-            <div className="flex items-center justify-between mb-8">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500">
-                  <Star size={20} fill={results.rating ? "currentColor" : "none"} />
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-10">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500">
+                  <Star size={24} fill={results.score ? "currentColor" : "none"} />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="font-bold">Analysis Results</h3>
+                    <h3 className="text-2xl font-bold">Analysis Results</h3>
                     {results.isMock && (
                       <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 text-[10px] font-bold uppercase tracking-wider border border-amber-500/20">
                         Demo Mode
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-foreground/40">
-                    {results.isMock ? "Simulated review (OpenAI Quota Limit)" : "Powered by OpenAI gpt-4o-mini"}
+                  <p className="text-sm text-foreground/40">
+                    {results.isMock ? "Simulated review (API Error)" : "Powered by AI"}
                   </p>
                 </div>
               </div>
               <button
                 onClick={exportToPDF}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold transition-all"
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-bold transition-all"
               >
-                <Download size={14} />
-                Export PDF
+                <Download size={16} />
+                Export PDF Report
               </button>
             </div>
-            {activeTab === "bugs" && (
-              <div className="space-y-4">
-                {results.bugs && results.bugs.length > 0 ? (
-                  results.bugs.map((bug, i) => (
-                    <div key={i} className="flex gap-4 p-4 rounded-xl bg-red-500/5 border border-red-500/10 text-foreground/80">
-                      <div className="mt-1 flex-shrink-0 text-red-500 font-bold">#{i+1}</div>
-                      <p>{bug}</p>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-center py-12 text-foreground/40">No critical bugs found! Good job.</div>
+
+            <div className="space-y-12">
+              {/* Score & Overview Section */}
+              <div className="flex flex-col items-center justify-center py-10 px-4 space-y-6 bg-black/20 rounded-2xl border border-white/5">
+                <p className="text-foreground/60 font-bold tracking-[0.2em] uppercase text-xs">Code Quality Score</p>
+                <div className="relative flex items-center justify-center">
+                  <div className="absolute inset-0 bg-blue-500 blur-3xl opacity-20 animate-pulse"></div>
+                  <div className="text-8xl font-black text-blue-500 relative">
+                    {results.score}
+                    <span className="text-3xl text-foreground/40 font-normal">/100</span>
+                  </div>
+                </div>
+                {results.documentation && (
+                  <p className="text-center text-foreground/80 max-w-3xl text-sm leading-relaxed mt-4">
+                    {results.documentation}
+                  </p>
                 )}
               </div>
-            )}
 
-            {activeTab === "suggestions" && (
-              <div className="space-y-4">
-                {results.suggestions && results.suggestions.length > 0 ? (
-                  results.suggestions.map((sug, i) => (
-                    <div key={i} className="flex gap-4 p-4 rounded-xl bg-blue-500/5 border border-blue-500/10 text-foreground/80 group">
-                      <div className="mt-1 flex-shrink-0 text-blue-500">
-                        <CheckCircle2 size={18} />
+              {/* Issues Section */}
+              <div className="space-y-6">
+                <div className="flex items-center gap-3 text-red-500 pb-2 border-b border-white/5">
+                  <Bug size={24} />
+                  <h4 className="text-xl font-bold text-foreground">Issues Found</h4>
+                </div>
+                <div className="grid gap-4">
+                  {results.issues && results.issues.length > 0 ? (
+                    results.issues.map((issue, i) => (
+                      <div key={i} className="flex flex-col sm:flex-row gap-4 p-5 rounded-xl bg-red-500/5 border border-red-500/10 text-foreground/80">
+                        <div className="flex-shrink-0">
+                          <span className="px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-red-500/20 text-red-400 border border-red-500/20">
+                            {issue.type || "Issue"}
+                          </span>
+                        </div>
+                        <p className="flex-1 text-sm leading-relaxed">{issue.description}</p>
                       </div>
-                      <p className="flex-1">{sug}</p>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-center py-12 text-foreground/40">No major suggestions for improvement.</div>
-                )}
+                    ))
+                  ) : (
+                    <div className="text-center py-12 text-foreground/40 bg-white/5 rounded-xl border border-white/5">No critical issues found! Excellent work.</div>
+                  )}
+                </div>
               </div>
-            )}
 
-            {activeTab === "documentation" && (
-              <div className="prose prose-invert max-w-none">
-                <div className="p-6 rounded-xl bg-white/5 border border-border">
-                  <div className="flex justify-between items-start mb-4">
-                    <p className="text-foreground/80 leading-relaxed whitespace-pre-wrap flex-1">
-                      {results.documentation}
-                    </p>
+              {/* Suggestions Section */}
+              <div className="space-y-6">
+                <div className="flex items-center gap-3 text-yellow-500 pb-2 border-b border-white/5">
+                  <Lightbulb size={24} />
+                  <h4 className="text-xl font-bold text-foreground">Suggestions</h4>
+                </div>
+                <div className="grid gap-4">
+                  {results.suggestions && results.suggestions.length > 0 ? (
+                    results.suggestions.map((sug, i) => (
+                      <div key={i} className="flex gap-4 p-5 rounded-xl bg-yellow-500/5 border border-yellow-500/10 text-foreground/80">
+                        <div className="mt-0.5 flex-shrink-0 text-yellow-500">
+                          <CheckCircle2 size={18} />
+                        </div>
+                        <p className="flex-1 text-sm leading-relaxed">{sug}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-12 text-foreground/40 bg-white/5 rounded-xl border border-white/5">No major suggestions.</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Improved Code Section */}
+              {results.improvedCode && (
+                <div className="space-y-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-white/5">
+                    <div className="flex items-center gap-3 text-green-500">
+                      <Code2 size={24} />
+                      <h4 className="text-xl font-bold text-foreground">Improved Code</h4>
+                    </div>
                     <button
-                      onClick={() => handleCopy(results.documentation)}
-                      className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-foreground/40 hover:text-white transition-all ml-4"
-                      title="Copy Docs"
+                      onClick={() => handleCopy(results.improvedCode)}
+                      className="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold transition-all"
                     >
-                      <Download size={14} className="rotate-180" />
+                      Copy Code
                     </button>
                   </div>
-                  <div className="bg-black/40 rounded-lg overflow-hidden border border-border">
-                    <div className="flex items-center justify-between px-4 py-2 bg-white/5 border-b border-border">
-                      <span className="text-xs font-mono text-foreground/40">Analyzed Code</span>
+                  <div className="bg-[#1E1E1E] rounded-xl overflow-hidden border border-white/10 shadow-2xl">
+                    <div className="flex items-center px-4 py-3 bg-black/40 border-b border-white/5">
+                      <div className="flex gap-2">
+                        <div className="w-3 h-3 rounded-full bg-red-500/80"></div>
+                        <div className="w-3 h-3 rounded-full bg-yellow-500/80"></div>
+                        <div className="w-3 h-3 rounded-full bg-green-500/80"></div>
+                      </div>
+                      <span className="ml-4 text-xs font-mono text-foreground/40">{detectedLang}</span>
                     </div>
                     <SyntaxHighlighter
                       language={detectedLang}
@@ -471,41 +470,17 @@ export default function Home() {
                       customStyle={{
                         background: 'transparent',
                         padding: '1.5rem',
-                        fontSize: '0.85rem',
+                        fontSize: '0.9rem',
                         lineHeight: '1.6',
+                        margin: 0
                       }}
                     >
-                      {code}
+                      {results.improvedCode}
                     </SyntaxHighlighter>
                   </div>
                 </div>
-              </div>
-            )}
-
-            {activeTab === "rating" && (
-              <div className="flex flex-col items-center justify-center py-12 space-y-6">
-                <div className="relative flex items-center justify-center">
-                  <div className="absolute inset-0 bg-blue-500 blur-3xl opacity-20 animate-pulse"></div>
-                  <div className="text-8xl font-black text-blue-500 relative">
-                    {results.rating}
-                    <span className="text-2xl text-foreground/40 font-normal">/10</span>
-                  </div>
-                </div>
-                <div className="flex gap-1">
-                  {[...Array(10)].map((_, i) => (
-                    <Star 
-                      key={i} 
-                      size={20} 
-                      className={cn(
-                        "transition-all",
-                        i < results.rating ? "text-yellow-500 fill-yellow-500" : "text-foreground/10"
-                      )} 
-                    />
-                  ))}
-                </div>
-                <p className="text-foreground/60 font-medium tracking-wide uppercase text-xs">Overall Code Quality</p>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </section>
       )}

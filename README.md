@@ -1,12 +1,13 @@
 # AI Code Reviewer
 
-A professional, full-stack AI-powered code review tool built with Next.js (App Router), Tailwind CSS, and OpenAI.
+This is an AI-powered Code Review application. It allows users to input code and receive structured feedback including a code quality score, identified issues, improvement suggestions, and an optimized version of the code. The system processes AI responses in JSON format dynamically, renders results with categorized badges, and ensures a clean and user-friendly interface with proper loading and error handling.
 
 ## Features
-- **AI-Powered Analysis**: Deep scan for bugs and suggestions.
-- **Modern UI**: Dark-themed, glassmorphic dashboard.
-- **Structured Feedback**: Organized tabs for Bugs, Suggestions, and Rating.
-- **Robust API**: Handles various code formats and provides detailed JSON feedback.
+- **AI-Powered Analysis**: Deep scan for code quality, issue identification, and refactoring using Google Gemini.
+- **Modern UI**: Dark-themed, glassmorphic dashboard built with Tailwind CSS.
+- **Structured Feedback**: Clean single-page output showing Score (0-100), Issues with categorized badges, Suggestions, and Improved Code views.
+- **PDF Export**: Generate structured, academic-friendly analysis reports directly to PDF.
+- **Robust API**: Handles various code formats natively and guarantees structured JSON reviews from the LLM.
 
 ## Setup Instructions
 
@@ -24,9 +25,9 @@ npm install
 ```
 
 ### 3. Environment Configuration
-Create a `.env.local` file in the root directory and add your OpenAI API key:
+Create a `.env.local` file in the root directory and add your Google Gemini API key:
 ```bash
-OPENAI_API_KEY=your_openai_api_key_here
+GEMINI_API_KEY=your_gemini_api_key_here
 ```
 *(You can use `.env.example` as a template.)*
 

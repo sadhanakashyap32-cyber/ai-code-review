@@ -53,14 +53,18 @@ export async function POST(request) {
     }
 
     const prompt = `
-      Review the following piece of code.
+      Review the following piece of code. Provide a professional, academic-level code review.
       Return the results EXCLUSIVELY in valid JSON format with the exact following schema:
       {
-        "bugs": ["bug 1", "bug 2"],
-        "suggestions": ["suggestion 1", "suggestion 2"],
-        "rating": 8,
+        "issues": [
+          { "type": "Bug | Performance | Readability | Security | Best Practice", "description": "Detailed description of the issue" }
+        ],
+        "suggestions": ["Actionable suggestion 1", "Actionable suggestion 2"],
+        "score": 85, 
+        "improvedCode": "The fully refactored and improved version of the code",
         "documentation": "A short markdown description of what the code does."
       }
+      Note: score should be between 0 and 100.
 
       Code to review:
       \`\`\`
