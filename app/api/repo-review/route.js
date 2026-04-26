@@ -73,7 +73,7 @@ export async function POST(request) {
     }
 
     // Step 3: Run AI Analysis
-    const prompt = \`
+    const prompt = `
       Review the following GitHub repository source files. Provide a professional code review.
       Return the results EXCLUSIVELY in valid JSON format with the exact following schema:
       {
@@ -90,8 +90,8 @@ export async function POST(request) {
       Note: score should be between 0 and 100. Provide maximum 10 most critical file breakdowns.
 
       Repository Code Payload:
-      \${repoData.combinedCode}
-    \`;
+      ${repoData.combinedCode}
+    `;
 
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
@@ -108,7 +108,7 @@ export async function POST(request) {
     // Add metadata payload warning logic to the response if truncated
     if (repoData.isTruncated) {
        parsedResult.isTruncated = true;
-       parsedResult.truncationWarning = \`Repository too large. Analyzed \${repoData.filesAnalyzed} priority files.\`;
+       parsedResult.truncationWarning = `Repository too large. Analyzed ${repoData.filesAnalyzed} priority files.`;
     }
 
     // Save to Database mapping to Review model
