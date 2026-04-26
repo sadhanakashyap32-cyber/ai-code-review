@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "../auth/[...nextauth]/route";
+import { prisma } from "../../../lib/prisma";
+import { trackAndEnforceUsage, incrementUsage } from "../../../lib/usageTracker";
 
 const getGeminiClient = () => {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -9,9 +13,6 @@ const getGeminiClient = () => {
   return new GoogleGenAI({ apiKey });
 };
 
-/**
- * Robustly extract JSON from an AI response, handling potential markdown blocks.
- */
 function extractJson(content) {
   if (!content) return null;
   try {
@@ -29,15 +30,67 @@ function extractJson(content) {
   }
 }
 
+// Fetch user's reviews
+export async function GET(request) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "10");
+    const skip = (page - 1) * limit;
+
+    const [reviews, total] = await Promise.all([
+      prisma.review.findMany({
+        where: { userId: session.user.id },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.review.count({ where: { userId: session.user.id } })
+    ]);
+
+    return NextResponse.json({
+      reviews,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit)
+    }, { status: 200 });
+
+  } catch (error) {
+    console.error("Fetch Reviews Error:", error);
+    return NextResponse.json({ error: "Failed to fetch reviews" }, { status: 500 });
+  }
+}
+
 export async function POST(request) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user) {
+      return NextResponse.json({ error: "Unauthorized. Please log in first." }, { status: 401 });
+    }
+
     const body = await request.json();
-    const { code } = body;
+    const { code, language } = body;
 
     if (!code || typeof code !== "string" || code.trim() === "") {
       return NextResponse.json(
         { error: "Valid, non-empty code must be provided for review." },
         { status: 400 }
+      );
+    }
+
+    // Step 1: Enforce Daily Usage Limits before AI call
+    const userDbInfo = await prisma.user.findUnique({ where: { id: session.user.id } });
+    const usageCheck = await trackAndEnforceUsage(userDbInfo);
+    
+    if (!usageCheck.success) {
+      return NextResponse.json(
+        { error: usageCheck.error },
+        { status: 403 }
       );
     }
 
@@ -85,16 +138,30 @@ export async function POST(request) {
     const content = response.text;
     const parsedResult = extractJson(content);
 
-    return NextResponse.json({ ...parsedResult, isMock: false }, { status: 200 });
+    // Save to Database
+    const savedReview = await prisma.review.create({
+      data: {
+        userId: session.user.id,
+        code: code,
+        language: language || "detect",
+        review: parsedResult
+      }
+    });
+
+    // Step 2: Increment usage count after successful operation if user is on FREE tier
+    if (userDbInfo.plan === "FREE") {
+      await incrementUsage(session.user.id);
+    }
+
+    return NextResponse.json({ ...parsedResult, id: savedReview.id, isMock: false }, { status: 200 });
 
   } catch (error) {
     console.error("AI Review Error Details:", error);
-    
     const errorMessage = error.message || "Failed to generate code review using Gemini.";
-
     return NextResponse.json(
       { error: errorMessage },
       { status: 500 }
     );
   }
 }
+
