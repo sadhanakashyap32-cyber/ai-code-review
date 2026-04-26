@@ -14,6 +14,8 @@ const getGeminiClient = () => {
   return new GoogleGenAI({ apiKey });
 };
 
+const isSqlite = () => process.env.DATABASE_URL?.startsWith("file:");
+
 function extractJson(content) {
   if (!content) return null;
   try {
@@ -52,7 +54,12 @@ export async function GET(request) {
       prisma.review.count({ where: { userId: session.user.id } })
     ]);
 
-    return NextResponse.json({ reviews, total, page, totalPages: Math.ceil(total / limit) }, { status: 200 });
+    const processedReviews = reviews.map(r => ({
+      ...r,
+      review: (isSqlite() && typeof r.review === 'string') ? JSON.parse(r.review) : r.review
+    }));
+
+    return NextResponse.json({ reviews: processedReviews, total, page, totalPages: Math.ceil(total / limit) }, { status: 200 });
   } catch (error) {
     return NextResponse.json({ error: "Failed to fetch reviews" }, { status: 500 });
   }
@@ -72,25 +79,35 @@ export async function POST(request) {
     if (!usageCheck.success) return NextResponse.json({ error: usageCheck.error }, { status: 403 });
 
     const ai = getGeminiClient();
-    const prompt = "Review the following code. Return EXCLUSIVELY a JSON object with: issues (array), suggestions (array), score (number), improvedCode (string), documentation (string).\n\nCode:\n" + code;
+    
+    const prompt = `Review the following code. Return EXCLUSIVELY a JSON object with: 
+    issues (array of {type: string, description: string}), 
+    suggestions (array of strings), 
+    score (number 0-100), 
+    improvedCode (string), 
+    documentation (string).
+
+    Code:
+    ${code}`;
 
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
-        systemInstruction: "Expert code reviewer. Output only JSON.",
+        systemInstruction: "You are an expert code reviewer. You must output only a valid JSON object matching the requested schema.",
         temperature: 0.1,
       }
     });
 
     const parsedResult = extractJson(response.text);
+
     const savedReview = await prisma.review.create({
       data: {
         userId: session.user.id,
         code,
         language: language || "detect",
-        review: parsedResult
+        review: isSqlite() ? JSON.stringify(parsedResult) : parsedResult
       }
     });
 

@@ -68,10 +68,31 @@ export default function Home() {
   const [mode, setMode] = useState("manual"); // 'manual' | 'github'
   const [detectedLang, setDetectedLang] = useState("javascript");
 
+  const [loadingMessage, setLoadingMessage] = useState("");
+
+  const loadingMessages = [
+    "Fetching source files...",
+    "Scanning for vulnerabilities...",
+    "Analyzing architecture...",
+    "Generating improvements...",
+    "Finalizing review..."
+  ];
+
+  const startLoadingAnimation = () => {
+    setLoading(true);
+    let i = 0;
+    setLoadingMessage(loadingMessages[0]);
+    const interval = setInterval(() => {
+      i = (i + 1) % loadingMessages.length;
+      setLoadingMessage(loadingMessages[i]);
+    }, 3000);
+    return interval;
+  };
+
   const handleRepoReview = async () => {
     if (!githubUrl.trim()) return;
     
-    setLoading(true);
+    const interval = startLoadingAnimation();
     setResults(null);
     setError(null);
     
@@ -94,13 +115,14 @@ export default function Home() {
       setError(err.message);
     } finally {
       setLoading(false);
+      clearInterval(interval);
     }
   };
 
   const handleReview = async () => {
     if (!code.trim()) return;
     
-    setLoading(true);
+    const interval = startLoadingAnimation();
     setResults(null);
     setError(null);
     
@@ -121,13 +143,14 @@ export default function Home() {
     } catch (err) {
       console.error(err);
       const isConnectionError = err.message.toLowerCase().includes("connection error") || 
-                               err.message.toLowerCase().includes("fetch");
+                                err.message.toLowerCase().includes("fetch");
       setError(isConnectionError 
         ? "Network connection error. Please check your internet connection or ensure you can reach api.openai.com." 
         : err.message
       );
     } finally {
       setLoading(false);
+      clearInterval(interval);
     }
   };
 
@@ -137,6 +160,7 @@ export default function Home() {
     setResults(null);
     setError(null);
     setMode("manual");
+    setLoadingMessage("");
   };
 
   const handleCopy = (text) => {
@@ -295,7 +319,7 @@ export default function Home() {
                 )}
               >
                 {loading ? <Loader2 className="animate-spin" size={18} /> : <Github size={18} />}
-                {loading ? "Analyzing Entire Repository..." : "Review Active Repository"}
+                {loading ? loadingMessage : "Review Active Repository"}
               </button>
             </div>
           </div>
@@ -345,7 +369,7 @@ export default function Home() {
               )}
             >
               {loading ? <Loader2 className="animate-spin" /> : <Send size={18} />}
-              {loading ? "Analyzing..." : "Review Code"}
+              {loading ? loadingMessage : "Review Code"}
             </button>
           </div>
         </div>

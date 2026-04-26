@@ -15,6 +15,8 @@ const getGeminiClient = () => {
   return new GoogleGenAI({ apiKey });
 };
 
+const isSqlite = () => process.env.DATABASE_URL?.startsWith("file:");
+
 function extractJson(content) {
   if (!content) return null;
   try {
@@ -62,17 +64,8 @@ export async function POST(request) {
     // Step 2: Fetch Repository Payload
     const repoData = await fetchGithubRepoData(repoUrl);
 
-    let ai;
-    try {
-      ai = getGeminiClient();
-    } catch (configError) {
-      return NextResponse.json(
-        { error: "Server configuration error: Missing Gemini API Key." },
-        { status: 500 }
-      );
-    }
-
-    // Step 3: Run AI Analysis
+    const ai = getGeminiClient();
+    
     const prompt = `
       Review the following GitHub repository source files. Provide a professional code review.
       Return the results EXCLUSIVELY in valid JSON format with the exact following schema:
@@ -117,7 +110,7 @@ export async function POST(request) {
         userId: session.user.id,
         code: repoData.combinedCode.substring(0, 5000), 
         language: "multi",
-        review: parsedResult,
+        review: isSqlite() ? JSON.stringify(parsedResult) : parsedResult,
         repoUrl: repoUrl,
         type: "repo",
         repoSize: repoData.repoSize,

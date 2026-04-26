@@ -4,6 +4,8 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../auth/[...nextauth]/route";
 import { prisma } from "../../../../lib/prisma";
 
+const isSqlite = () => process.env.DATABASE_URL?.startsWith("file:");
+
 export async function GET(request, { params }) {
   try {
     const session = await getServerSession(authOptions);
@@ -25,7 +27,12 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    return NextResponse.json(review, { status: 200 });
+    const processedReview = {
+      ...review,
+      review: (isSqlite() && typeof review.review === 'string') ? JSON.parse(review.review) : review.review
+    };
+
+    return NextResponse.json(processedReview, { status: 200 });
   } catch (error) {
     console.error("Fetch Review Error:", error);
     return NextResponse.json({ error: "Failed to fetch review details" }, { status: 500 });
