@@ -11,7 +11,6 @@ const getGeminiClient = () => {
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY is not configured in environment variables.");
   }
-  // gemini-2.5-flash has an enormous context window 
   return new GoogleGenAI({ apiKey });
 };
 
@@ -115,7 +114,7 @@ export async function POST(request) {
     const savedReview = await prisma.review.create({
       data: {
         userId: session.user.id,
-        code: repoData.combinedCode.substring(0, 5000), // Only save sample structure so dashboard doesn't lag 
+        code: repoData.combinedCode.substring(0, 5000), 
         language: "multi",
         review: parsedResult,
         repoUrl: repoUrl,
