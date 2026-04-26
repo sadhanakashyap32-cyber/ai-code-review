@@ -116,7 +116,7 @@ export default function DashboardPage() {
                 <div className="h-2 w-full bg-black/40 rounded-full overflow-hidden">
                   <div 
                     className="h-full bg-blue-500 transition-all duration-1000 ease-out" 
-                    style={{ width: \`\${Math.min((analytics.reviewsToday / 5) * 100, 100)}%\` }}
+                    style={{ width: `${Math.min((analytics.reviewsToday / 5) * 100, 100)}%` }}
                   ></div>
                 </div>
               </div>
