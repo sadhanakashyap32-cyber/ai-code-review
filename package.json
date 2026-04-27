@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "cross-env NODE_OPTIONS='--dns-result-order=ipv4first' next dev",
-    "build": "next build",
+    "build": "npx prisma db push && next build",
     "start": "next start",
     "lint": "next lint"
   },
