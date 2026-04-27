@@ -17,6 +17,9 @@ export const authOptions = {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID || "FALLBACK_ID",
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || "FALLBACK_SECRET",
+      httpOptions: {
+        timeout: 10000,
+      },
     }),
   ],
   pages: {

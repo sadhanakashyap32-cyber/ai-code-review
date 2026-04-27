@@ -16,7 +16,7 @@ Follow these steps to set up and run the project locally.
 ### 1. Prerequisites
 - **Node.js**: v18.17.0 or later.
 - **npm**: v9.0.0 or later.
-- **OpenAI API Key**: required for code analysis.
+- **Google Gemini API Key**: required for code analysis.
 
 ### 2. Installation
 Clone the repository (or navigate to the project folder) and install the dependencies:

@@ -1,4 +1,7 @@
 export const dynamic = "force-dynamic";
+import dns from "node:dns";
+dns.setDefaultResultOrder("ipv4first");
+
 import { NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { getServerSession } from "next-auth/next";
@@ -91,7 +94,7 @@ export async function POST(request) {
     ${code}`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3-flash-preview",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -115,6 +118,7 @@ export async function POST(request) {
     return NextResponse.json({ ...parsedResult, id: savedReview.id }, { status: 200 });
 
   } catch (error) {
+    console.error("Gemini API Error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

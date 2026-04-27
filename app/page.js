@@ -145,7 +145,7 @@ export default function Home() {
       const isConnectionError = err.message.toLowerCase().includes("connection error") || 
                                 err.message.toLowerCase().includes("fetch");
       setError(isConnectionError 
-        ? "Network connection error. Please check your internet connection or ensure you can reach api.openai.com." 
+        ? "Network connection error. Please check your internet connection or ensure you can reach the Gemini AI service." 
         : err.message
       );
     } finally {

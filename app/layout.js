@@ -50,7 +50,7 @@ export default async function RootLayout({ children }) {
               </main>
 
               <footer className="border-t border-border py-6 px-8 text-center text-sm text-foreground/40 flex-shrink-0">
-                <p>© 2026 AI Code Reviewer. Powered by OpenAI.</p>
+                <p>© 2026 AI Code Reviewer. Powered by Google Gemini.</p>
               </footer>
             </div>
           )}

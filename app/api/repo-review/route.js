@@ -1,4 +1,7 @@
 export const dynamic = "force-dynamic";
+import dns from "node:dns";
+dns.setDefaultResultOrder("ipv4first");
+
 import { NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { getServerSession } from "next-auth/next";
@@ -87,7 +90,7 @@ export async function POST(request) {
     `;
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3-flash-preview",
       contents: prompt,
       config: {
         responseMimeType: "application/json",

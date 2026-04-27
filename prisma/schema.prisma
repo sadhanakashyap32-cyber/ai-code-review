@@ -1,5 +1,5 @@
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -14,12 +14,12 @@ model Account {
   type              String
   provider          String
   providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
+  refresh_token     String? 
+  access_token      String? 
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String? @db.Text
+  id_token          String? 
   session_state     String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -35,11 +35,7 @@ model Session {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-enum Plan {
-  FREE
-  PRO
-}
-
+// SQLite doesn't support enums natively in Prisma, using String with @default("FREE")
 model User {
   id                     String    @id @default(cuid())
   name                   String?
@@ -47,7 +43,7 @@ model User {
   emailVerified          DateTime?
   image                  String?
   
-  plan                   Plan      @default(FREE)
+  plan                   String    @default("FREE") // Values: "FREE", "PRO"
   stripeCustomerId       String?   @unique
   stripeSubscriptionId   String?   @unique
   stripePriceId          String?
@@ -62,7 +58,7 @@ model User {
 model Usage {
   id        String   @id @default(cuid())
   userId    String
-  date      DateTime @db.Date
+  date      DateTime 
   count     Int      @default(0)
 
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -83,8 +79,8 @@ model VerificationToken {
 model Review {
   id            String   @id @default(cuid())
   userId        String
-  code          String   @db.Text
-  review        Json     // AI response stored natively as JSON
+  code          String   
+  review        String   // AI response stored as JSON string (handled by isSqlite() logic in code)
   language      String?
   createdAt     DateTime @default(now())
 
