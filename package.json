@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "cross-env NODE_OPTIONS='--dns-result-order=ipv4first' next dev",
-    "build": "npx prisma db push && next build",
+    "dev": "cross-env next dev",
+    "build": "npx prisma generate && next build",
     "start": "next start",
     "lint": "next lint"
   },
