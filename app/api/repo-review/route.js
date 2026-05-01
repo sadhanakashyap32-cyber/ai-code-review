@@ -113,7 +113,7 @@ export async function POST(request) {
         userId: session.user.id,
         code: repoData.combinedCode.substring(0, 5000), 
         language: "multi",
-        review: isSqlite() ? JSON.stringify(parsedResult) : parsedResult,
+        review: JSON.stringify(parsedResult),
         repoUrl: repoUrl,
         type: "repo",
         repoSize: repoData.repoSize,

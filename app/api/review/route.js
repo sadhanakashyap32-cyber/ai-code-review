@@ -110,7 +110,7 @@ export async function POST(request) {
         userId: session.user.id,
         code,
         language: language || "detect",
-        review: isSqlite() ? JSON.stringify(parsedResult) : parsedResult
+        review: JSON.stringify(parsedResult)
       }
     });
 
